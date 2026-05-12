@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FX Monitor – Dólar / Real</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.29.1.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="loadingOverlay">
+    <div class="loader-content">
+      <div class="loader-ring"></div>
+      <p class="loader-text">Carregando dados do BCB<span class="dots"></span></p>
+    </div>
+  </div>
+
+  <div id="errorBanner" class="hidden">
+    <span>⚠️ Falha ao buscar dados. Verifique sua conexão.</span>
+    <button>✕</button>
+  </div>
+
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-icon">₿</span>
+        <div>
+          <div class="brand-title">FX Monitor</div>
+          <div class="brand-sub">Câmbio em tempo real</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a href="index.html" class="nav-item active">
+          <span class="nav-icon">$</span>
+          <span>Dólar</span>
+        </a>
+        <a href="euro.html" class="nav-item">
+          <span class="nav-icon">€</span>
+          <span>Euro</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-section">
+        <!-- data-action é o contrato com ui.js — sem onclick inline -->
+        <button class="btn-personalizar" data-action="open-menu">
+          <span class="btn-icon">🎨</span>
+          <span>Personalizar Gráficos</span>
+        </button>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-label">Atualização automática</div>
+        <select id="intervalo" class="styled-select">
+          <option value="3600000">A cada 1 hora</option>
+          <option value="21600000" selected>A cada 6 horas</option>
+          <option value="43200000">A cada 12 horas</option>
+          <option value="86400000">A cada 24 horas</option>
+        </select>
+        <button id="btnAtualizarAgora" class="btn-update">
+          <span class="btn-icon">↻</span> Atualizar agora
+        </button>
+        <div id="ultimaAtualizacao" class="update-time">—</div>
+
+        <div class="auto-update-info">
+          <div class="info-icon">ℹ️</div>
+          <div class="info-text">
+            <b>Atualiza sozinho!</b> O browser busca dados do BCB no intervalo
+            escolhido. Cache de 1h evita requisições desnecessárias.
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-label">Comparar meses</div>
+        <div class="compare-row">
+          <select id="mes1" class="styled-select half"></select>
+          <select id="mes2" class="styled-select half"></select>
+        </div>
+        <button id="analisar" class="btn-compare">Comparar →</button>
+      </div>
+
+      <div id="infoBox" class="info-box">
+        <div class="info-hint">Clique em um ponto do gráfico ou compare dois meses.</div>
+        <div id="detalhes" class="hidden"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1>Dólar <span class="currency-tag">USD/BRL</span></h1>
+          <p class="subtitle">Série histórica 2020 – hoje · Dados reais · Fonte: BCB SGS 10813</p>
+        </div>
+        <div class="topbar-stats" id="statsBar">
+          <div class="stat-card" id="statAtual">
+            <div class="stat-label">Cotação atual</div>
+            <div class="stat-value">—</div>
+          </div>
+          <div class="stat-card" id="statMax">
+            <div class="stat-label">Máxima histórica</div>
+            <div class="stat-value">—</div>
+          </div>
+          <div class="stat-card" id="statMin">
+            <div class="stat-label">Mínima histórica</div>
+            <div class="stat-value">—</div>
+          </div>
+          <div class="stat-card" id="statVar">
+            <div class="stat-label">Var. no ano</div>
+            <div class="stat-value">—</div>
+          </div>
+        </div>
+      </header>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-header">
+            <span class="chart-title">Valor mensal (R$)</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span class="chart-badge real">R$</span>
+              <button class="btn-chart-settings" data-action="open-menu" title="Personalizar">⚙️</button>
+            </div>
+          </div>
+          <div id="grafico_valor" class="grafico"></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <span class="chart-title">Variação percentual mensal</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span class="chart-badge pct">%</span>
+              <button class="btn-chart-settings" data-action="open-menu" title="Personalizar">⚙️</button>
+            </div>
+          </div>
+          <div id="grafico_pct" class="grafico"></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-header">
+          <span class="chart-title">Histórico completo</span>
+          <button id="btnExportCSV" class="btn-export">⬇ Exportar CSV</button>
+        </div>
+        <div class="table-wrapper">
+          <table id="tabelaDados">
+            <thead>
+              <tr>
+                <th>Mês</th>
+                <th>Abertura (R$)</th>
+                <th>Fechamento (R$)</th>
+                <th>Variação (R$)</th>
+                <th>Variação (%)</th>
+                <th>Tipo</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!--
+    type="module" habilita ES Modules nativos — sem bundler necessário.
+    O browser resolve os imports automaticamente.
+    Vercel serve os arquivos estáticos normalmente.
+  -->
+  <script type="module">
+    import { initFX } from './modules/controller.js';
+
+    initFX({
+      serieId:    '10813',
+      moeda:      'Dólar',
+      simbolo:    'USD',
+      grafValorEl: 'grafico_valor',
+      grafPctEl:   'grafico_pct',
+    });
+  </script>
+</body>
+</html>
